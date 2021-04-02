@@ -32,6 +32,7 @@ import org.apache.spark.shuffle.internal.{BufferManagerOptions, RssSparkListener
 
 import scala.collection.JavaConverters
 
+
 class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   logInfo(s"Creating ShuffleManager instance: ${this.getClass.getSimpleName}, version: ${
     RssBuildInfo.Version
@@ -316,7 +317,14 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
     }
   }
 
-  override def getReader[K, C](handle: ShuffleHandle, startMapIndex: Int, endMapIndex: Int,
+  override def getReader[K, C](handle: ShuffleHandle, startPartition: Int, endPartition: Int,
+                               context: TaskContext, metrics: ShuffleReadMetricsReporter):
+      ShuffleReader[K, C] = {
+    getReaderForRange(handle, 0, Integer.MAX_VALUE, startPartition, endPartition,
+      context, metrics)
+  }
+
+  override def getReaderForRange[K, C](handle: ShuffleHandle, startMapIndex: Int, endMapIndex: Int,
                                startPartition: Int, endPartition: Int, context: TaskContext,
                                metrics: ShuffleReadMetricsReporter): ShuffleReader[K, C] = {
     logInfo(s"getReader: Use ShuffleManager: ${
