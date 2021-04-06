@@ -21,12 +21,12 @@ import java.util.function.Supplier
 
 import org.apache.spark._
 import org.apache.spark.internal.Logging
-import org.apache.spark.remoteshuffle.{RssBuildInfo}
+import org.apache.spark.remoteshuffle.RssBuildInfo
 import org.apache.spark.remoteshuffle.clients.{MultiServerAsyncWriteClient, MultiServerHeartbeatClient, MultiServerSyncWriteClient, MultiServerWriteClient, PooledWriteClientFactory, ServerConnectionStringCache, ServerConnectionStringResolver, ServerReplicationGroupUtil, ShuffleWriteConfig}
 import org.apache.spark.remoteshuffle.common.{AppShuffleId, AppTaskAttemptId, ServerDetail, ServerList}
 import org.apache.spark.remoteshuffle.exceptions.{RssException, RssInvalidStateException, RssNoServerAvailableException, RssServerResolveException}
 import org.apache.spark.remoteshuffle.metadata.{ServerSequenceServiceRegistry, ServiceRegistry, ServiceRegistryUtils, StandaloneServiceRegistryClient}
-import org.apache.spark.remoteshuffle.metrics.{M3Stats, ShuffleClientStageMetrics, ShuffleClientStageMetricsKey}
+import org.apache.spark.remoteshuffle.metrics.M3Stats
 import org.apache.spark.remoteshuffle.util.{ExceptionUtils, RetryUtils, ServerHostAndPort, ThreadUtils}
 import org.apache.spark.shuffle.internal.{BufferManagerOptions, RssSparkListener, RssUtils}
 
@@ -47,8 +47,6 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   private val networkTimeoutMillis = conf.get(RssOpts.networkTimeout).toInt
   private val pollInterval = conf.get(RssOpts.pollInterval)
   private val dataAvailableWaitTime = conf.get(RssOpts.readerDataAvailableWaitTime)
-
-  private var shuffleClientStageMetrics: ShuffleClientStageMetrics = null
 
   private val serviceRegistry = createServiceRegistry
   private val dataCenter = getDataCenter
@@ -130,13 +128,6 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
         rssServerSelectionResult.servers.map(_.getConnectionString()),
         networkTimeoutMillis))
 
-    val shuffleClientStageMetricsKey = new ShuffleClientStageMetricsKey(user, queue)
-    shuffleClientStageMetrics = new ShuffleClientStageMetrics(shuffleClientStageMetricsKey)
-
-    shuffleClientStageMetrics.getNumRegisterShuffle.inc(1)
-    shuffleClientStageMetrics.getNumMappers().recordValue(1)
-    shuffleClientStageMetrics.getNumReducers().recordValue(numPartitions)
-
     val dependencyInfo = s"numPartitions: ${dependency.partitioner.numPartitions}, " +
       s"serializer: ${dependency.serializer.getClass().getSimpleName()}, " +
       s"keyOrdering: ${dependency.keyOrdering}, " +
@@ -174,8 +165,6 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
         )
 
         logDebug(s"getWriter $mapInfo")
-
-        createShuffleClientStageMetricsIfNeeded(rssShuffleHandle)
 
         val serializer = rssShuffleHandle.dependency.serializer
         val maxWaitMillis = conf.get(RssOpts.maxWaitTime)
@@ -298,14 +287,12 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
                 writeClient.connect()
 
                 new RssShuffleWriter(
-                  rssShuffleHandle.user,
                   new ServerList(rssShuffleHandle.rssServers.map(_.toServerDetail()).toArray),
                   writeClient,
                   mapInfo,
                   serializer,
                   bufferOptions,
                   rssShuffleHandle.dependency,
-                  shuffleClientStageMetrics,
                   metrics)
               } catch {
                 case ex: Throwable =>
@@ -356,9 +343,6 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
       shuffleDependency = rssShuffleHandle.dependency,
       rssServers = rssServers,
       partitionFanout = rssShuffleHandle.partitionFanout,
-      serviceRegistry = serviceRegistry,
-      serviceRegistryDataCenter = dataCenter,
-      serviceRegistryCluster = cluster,
       timeoutMillis = networkTimeoutMillis,
       maxRetryMillis = maxWaitMillis.toInt,
       dataAvailablePollInterval = pollInterval,
@@ -369,10 +353,6 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   }
 
   override def unregisterShuffle(shuffleId: Int): Boolean = {
-    if (shuffleClientStageMetrics != null) {
-      shuffleClientStageMetrics.close()
-    }
-
     true
   }
 
@@ -411,12 +391,7 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   }
 
   private def getDataCenter: String = {
-    return conf.get(RssOpts.dataCenter)
-  }
-
-  private def getZooKeeperServers: String = {
-    val serversValue = conf.get(RssOpts.serviceRegistryZKServers)
-    serversValue
+    conf.get(RssOpts.dataCenter)
   }
 
   private def getRssServers(numPartitions: Int,
@@ -472,15 +447,6 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
     }
 
     RssServerSelectionResult(serverArray, rssReplicas, partitionFanout)
-  }
-
-  private def createShuffleClientStageMetricsIfNeeded(
-      rssShuffleHandle: RssShuffleHandle[_, _, _]) = {
-    if (shuffleClientStageMetrics == null) {
-      val shuffleClientStageMetricsKey = new ShuffleClientStageMetricsKey(rssShuffleHandle.user,
-        rssShuffleHandle.queue)
-      shuffleClientStageMetrics = new ShuffleClientStageMetrics(shuffleClientStageMetricsKey)
-    }
   }
 
 }
