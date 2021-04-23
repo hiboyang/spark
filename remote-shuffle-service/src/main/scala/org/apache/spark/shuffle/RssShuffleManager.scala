@@ -62,10 +62,12 @@ class RssShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   } else {
     writerBufferSpill
   }
+  private val writerSupportAggregate = conf.get(RssOpts.writerSupportAggregate)
   private val bufferOptions = BufferManagerOptions(
     individualBufferSize = writerBufferSize,
     individualBufferMax = writerBufferMax,
-    bufferSpillThreshold = writerBufferSpillByEachExecutor
+    bufferSpillThreshold = writerBufferSpillByEachExecutor,
+    supportAggregate = writerSupportAggregate
   )
 
   private def getSparkContext = {
