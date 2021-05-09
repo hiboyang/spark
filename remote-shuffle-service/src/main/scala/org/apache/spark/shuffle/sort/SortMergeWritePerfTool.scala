@@ -30,6 +30,7 @@ class SortMergeWritePerfTool extends ShuffleWritePerfTool with Logging {
       taskAttemptId: Long):
     ShuffleWriter[Array[Byte], Array[Byte]] = {
     val sparkConf = new SparkConf(false)
+    val shuffleBlockResolver = new IndexShuffleBlockResolver(sparkConf)
     val handle = new BaseShuffleHandle[Array[Byte], Array[Byte], Array[Byte]](
       shuffleId,
       shuffleDependency)
@@ -38,6 +39,7 @@ class SortMergeWritePerfTool extends ShuffleWritePerfTool with Logging {
       "1",
       new util.HashMap[String, String]())
     new SortShuffleWriter(
+      shuffleBlockResolver = shuffleBlockResolver,
       handle = handle,
       mapId = appMapId.getMapId,
       context = new MockTaskContext(0, 0, taskAttemptId),
