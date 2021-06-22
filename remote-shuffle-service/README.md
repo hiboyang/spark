@@ -32,6 +32,12 @@ Following is one command example to use `dev/make-distribution.sh` under Spark r
 ./dev/make-distribution.sh --name spark-with-remote-shuffle-service-client --pip --tgz -Phive -Phive-thriftserver -Pkubernetes -Phadoop-3.2 -Phadoop-cloud -Dhadoop.version=3.2.0 -Premote-shuffle-service
 ```
 
+If you want to build a Spark docker image, you could unzip the Spark distribution tgz file, and run command like following:
+
+```
+./bin/docker-image-tool.sh -t spark-with-remote-shuffle-service build
+```
+
 This command creates `remote-shuffle-service_xxx.jar` file for remote shuffle service client 
 under `jars` directory in the generated Spark distribution. Now you could use this Spark 
 distribution to run your Spark application with remote shuffle service.
