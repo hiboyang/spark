@@ -24,6 +24,8 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
+import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, QueryStageExec}
+import org.apache.spark.sql.execution.columnar.InMemoryTableScanExec
 import org.apache.spark.sql.types.StructType
 
 /**
@@ -71,7 +73,11 @@ case class CollectMetricsExec(
       // - Performance issues due to excessive serialization.
       val updater = collector.copyAndReset()
       TaskContext.get().addTaskCompletionListener[Unit] { _ =>
-        collector.setState(updater)
+        if (collector.isZero) {
+          collector.setState(updater)
+        } else {
+          collector.merge(updater)
+        }
       }
 
       rows.map { r =>
@@ -88,8 +94,14 @@ object CollectMetricsExec {
    */
   def collect(plan: SparkPlan): Map[String, Row] = {
     val metrics = plan.collectWithSubqueries {
-      case collector: CollectMetricsExec => collector.name -> collector.collectedMetrics
+      case collector: CollectMetricsExec => Map(collector.name -> collector.collectedMetrics)
+      case tableScan: InMemoryTableScanExec =>
+        CollectMetricsExec.collect(tableScan.relation.cachedPlan)
+      case adaptivePlan: AdaptiveSparkPlanExec =>
+        CollectMetricsExec.collect(adaptivePlan.executedPlan)
+      case queryStageExec: QueryStageExec =>
+        CollectMetricsExec.collect(queryStageExec.plan)
     }
-    metrics.toMap
+    metrics.reduceOption(_ ++ _).getOrElse(Map.empty)
   }
 }
