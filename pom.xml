@@ -176,7 +176,7 @@
     <snappy.version>1.1.8.2</snappy.version>
     <netlib.java.version>1.1.2</netlib.java.version>
     <commons-codec.version>1.10</commons-codec.version>
-    <commons-compress.version>1.20</commons-compress.version>
+    <commons-compress.version>1.21</commons-compress.version>
     <commons-io.version>2.4</commons-io.version>
     <!-- org.apache.commons/commons-lang/-->
     <commons-lang2.version>2.6</commons-lang2.version>
@@ -202,6 +202,7 @@
     <paranamer.version>2.8</paranamer.version>
     <maven-antrun.version>1.8</maven-antrun.version>
     <commons-crypto.version>1.1.0</commons-crypto.version>
+    <tink.version>1.6.0</tink.version>
     <!--
     If you are changing Arrow version specification, please check ./python/pyspark/sql/utils.py,
     and ./python/setup.py too.
@@ -2270,6 +2271,11 @@
         </exclusions>
       </dependency>
       <dependency>
+        <groupId>com.google.crypto.tink</groupId>
+        <artifactId>tink</artifactId>
+        <version>${tink.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.thoughtworks.paranamer</groupId>
         <artifactId>paranamer</artifactId>
         <version>${paranamer.version}</version>
@@ -3194,7 +3200,7 @@
         </pluginManagement>
       </build>
     </profile>
-    
+
     <profile>
       <id>scala-2.13</id>
       <properties>
