@@ -283,6 +283,10 @@ class DateTimeUtilsSuite extends SparkFunSuite with Matchers with SQLHelper {
     }
   }
 
+  test("SPARK-36076: Cast string to timestamp throw ArrayIndexOutOfBounds") {
+    assert(toTimestamp(":8:434421+ 98:38", UTC) === None)
+  }
+
   test("SPARK-15379: special invalid date string") {
     // Test stringToDate
     assert(toDate("2015-02-29 00:00:00").isEmpty)
@@ -687,5 +691,10 @@ class DateTimeUtilsSuite extends SparkFunSuite with Matchers with SQLHelper {
       assert(toDate("today", zoneId).get === today)
       assert(toDate("tomorrow CET ", zoneId).get === today + 1)
     }
+  }
+
+  test("SPARK-35679: instantToMicros should be able to return microseconds of Long.MinValue") {
+    assert(instantToMicros(microsToInstant(Long.MaxValue)) === Long.MaxValue)
+    assert(instantToMicros(microsToInstant(Long.MinValue)) === Long.MinValue)
   }
 }

@@ -28,7 +28,7 @@ import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.scalatest.BeforeAndAfter
 
-import org.apache.spark.{SecurityManager, SparkConf, SparkFunSuite}
+import org.apache.spark.{SecurityManager, SparkConf, SparkException, SparkFunSuite}
 import org.apache.spark.deploy.k8s.{KubernetesExecutorConf, KubernetesExecutorSpec}
 import org.apache.spark.deploy.k8s.Config._
 import org.apache.spark.deploy.k8s.Constants._
@@ -93,6 +93,7 @@ class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
     when(kubernetesClient.pods()).thenReturn(podOperations)
     when(podOperations.withName(driverPodName)).thenReturn(driverPodOperations)
     when(driverPodOperations.get).thenReturn(driverPod)
+    when(driverPodOperations.waitUntilReady(any(), any())).thenReturn(driverPod)
     when(executorBuilder.buildFromFeatures(any(classOf[KubernetesExecutorConf]), meq(secMgr),
       meq(kubernetesClient), any(classOf[ResourceProfile]))).thenAnswer(executorPodAnswer())
     snapshotsStore = new DeterministicExecutorPodsSnapshotsStore()
@@ -567,6 +568,18 @@ class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
     assert(podsAllocatorUnderTest.numOutstandingPods.get() == 2)
     // We request pod 6
     verify(podOperations).create(podWithAttachedContainerForId(6))
+  }
+
+  test("print the pod name instead of Some(name) if pod is absent") {
+    val nonexistentPod = "i-do-not-exist"
+    val conf = new SparkConf().set(KUBERNETES_DRIVER_POD_NAME, nonexistentPod)
+    when(kubernetesClient.pods()).thenReturn(podOperations)
+    when(podOperations.withName(nonexistentPod)).thenReturn(driverPodOperations)
+    when(driverPodOperations.get()).thenReturn(null)
+    val e = intercept[SparkException](new ExecutorPodsAllocator(
+      conf, secMgr, executorBuilder, kubernetesClient, snapshotsStore, waitForExecutorPodsClock))
+    assert(e.getMessage.contains("No pod was found named i-do-not-exist in the cluster in the" +
+      " namespace default"))
   }
 
   private def executorPodAnswer(): Answer[KubernetesExecutorSpec] =

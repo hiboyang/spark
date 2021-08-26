@@ -102,16 +102,17 @@ def lit(col):
 def col(col):
     """
     Returns a :class:`~pyspark.sql.Column` based on the given column name.'
+    Examples
+    --------
+    >>> col('x')
+    Column<'x'>
+    >>> column('x')
+    Column<'x'>
     """
     return _invoke_function("col", col)
 
 
-@since(1.3)
-def column(col):
-    """
-    Returns a :class:`~pyspark.sql.Column` based on the given column name.'
-    """
-    return col(col)
+column = col
 
 
 @since(1.3)
@@ -1940,7 +1941,9 @@ def trunc(date, format):
     ----------
     date : :class:`~pyspark.sql.Column` or str
     format : str
-        'year', 'yyyy', 'yy' or 'month', 'mon', 'mm'
+        'year', 'yyyy', 'yy' to truncate by year,
+        or 'month', 'mon', 'mm' to truncate by month
+        Other options are: 'week', 'quarter'
 
     Examples
     --------
@@ -1963,8 +1966,11 @@ def date_trunc(format, timestamp):
     Parameters
     ----------
     format : str
-        'year', 'yyyy', 'yy', 'month', 'mon', 'mm',
-        'day', 'dd', 'hour', 'minute', 'second', 'week', 'quarter'
+        'year', 'yyyy', 'yy' to truncate by year,
+        'month', 'mon', 'mm' to truncate by month,
+        'day', 'dd' to truncate by day,
+        Other options are:
+        'microsecond', 'millisecond', 'second', 'minute', 'hour', 'week', 'quarter'
     timestamp : :class:`~pyspark.sql.Column` or str
 
     Examples
@@ -4153,7 +4159,10 @@ def _create_lambda(f):
 
     argnames = ["x", "y", "z"]
     args = [
-        _unresolved_named_lambda_variable(arg) for arg in argnames[: len(parameters)]
+        _unresolved_named_lambda_variable(
+            expressions.UnresolvedNamedLambdaVariable.freshVarName(arg)
+        )
+        for arg in argnames[: len(parameters)]
     ]
 
     result = f(*args)
